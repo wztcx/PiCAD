@@ -101,23 +101,20 @@ class AdvancedGradCAMEngine:
 def init_diagnostic_system():
     """
     初始化深度学习骨干网络并挂载Grad-CAM引擎
-    利用Streamlit缓存机制避免重复加载
     """
-    # 加载标准层架构的DenseNet-121
     if HAS_WEIGHTS:
         model = models.densenet121(weights=DenseNet121_Weights.DEFAULT)
     else:
         model = models.densenet121(pretrained=True)
         
-    # 修改全连接层，使其符合Normal与Pneumonia二分类需求
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Linear(num_ftrs, 2)
     
-    # 📌 提示：在实际工程应用中，此处应加载您训练好的模型微调权重：
-    # model.load_state_dict(torch.load('your_best_model.pth', map_location='cpu'))
+    # ❌ 【删除或注释掉旧的这一行】
+    # target_layer = model.features.norm5
     
-    # 锁定DenseNet-121的最后一层卷积特征层作为探针挂载点
-    target_layer = model.features.norm5
+    # 🌟 【替换为下面这一行：挂载到整个第四卷积块的输出端】
+    target_layer = model.features.denseblock4
     
     # 实例化Grad-CAM解算器
     cam_engine = AdvancedGradCAMEngine(model, target_layer)
