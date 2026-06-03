@@ -97,29 +97,50 @@ class AdvancedGradCAMEngine:
 # ==========================================
 # 3. 骨干网络加载与缓存保护机制
 # ==========================================
+# @st.cache_resource
+# def init_diagnostic_system():
+#     """
+#     初始化深度学习骨干网络并挂载Grad-CAM引擎
+#     """
+#     if HAS_WEIGHTS:
+#         model = models.densenet121(weights=DenseNet121_Weights.DEFAULT)
+#     else:
+#         model = models.densenet121(pretrained=True)
+        
+#     num_ftrs = model.classifier.in_features
+#     model.classifier = nn.Linear(num_ftrs, 2)
+    
+#     # ❌ 【删除或注释掉旧的这一行】
+#     # target_layer = model.features.norm5
+    
+#     # 🌟 【替换为下面这一行：挂载到整个第四卷积块的输出端】
+#     target_layer = model.features.denseblock4
+    
+#     # 实例化Grad-CAM解算器
+#     cam_engine = AdvancedGradCAMEngine(model, target_layer)
+#     return model, cam_engine
 @st.cache_resource
 def init_diagnostic_system():
     """
-    初始化深度学习骨干网络并挂载Grad-CAM引擎
+    初始化深度学习骨干网络并挂载Grad-CAM引擎（已整合本地 best_model.pth 真实权重）
     """
-    if HAS_WEIGHTS:
-        model = models.densenet121(weights=DenseNet121_Weights.DEFAULT)
-    else:
-        model = models.densenet121(pretrained=True)
+    # 1. 🌟 纯离线创建模型骨架（直接干掉之前的 if-else 联网加载逻辑，UI秒开）
+    model = models.densenet121(weights=None)
         
+    # 2. 重塑全连接层（必须和 train.py 里的二分类结构完全一致）
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Linear(num_ftrs, 2)
     
-    # ❌ 【删除或注释掉旧的这一行】
-    # target_layer = model.features.norm5
+    # 3. 🌟 核心注入：在这里强制加载你刚刚训练出来的真实肺炎诊断权重！
+    # 💡 确保你的 best_model.pth 文件和这个 app.py 放在同一个文件夹里
+    model.load_state_dict(torch.load('best_model.pth', map_location='cpu'))
     
-    # 🌟 【替换为下面这一行：挂载到整个第四卷积块的输出端】
+    # 4. 锁定第四卷积块作为探针挂载点（完美避开之前的 inplace 报错）
     target_layer = model.features.denseblock4
     
-    # 实例化Grad-CAM解算器
+    # 5. 实例化Grad-CAM解算器
     cam_engine = AdvancedGradCAMEngine(model, target_layer)
     return model, cam_engine
-
 
 # ==========================================
 # 4. 工作站 UI 展现层与业务流控制
